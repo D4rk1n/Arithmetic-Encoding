@@ -1,15 +1,8 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 from PIL import Image
 from numpy import *
 from collections import Counter , defaultdict
+import sys
 
-
-# In[2]:
 
 
 def encode(raw_data,dict,block_size):  #raw data as an array or a list 
@@ -26,9 +19,6 @@ def encode(raw_data,dict,block_size):  #raw data as an array or a list
     return encoded_data
 
 
-# In[3]:
-
-
 def encode_unit(data , dict , offset , block_size):# takes a dict {char : (lower , higher)}
     p=1 #probability of the first level 
     code = 0 
@@ -41,9 +31,6 @@ def encode_unit(data , dict , offset , block_size):# takes a dict {char : (lower
     return code
 
 
-# In[4]:
-
-
 def decode(encoded_data , dict , raw_length , block_size):
     decoded_data = []
     for c in encoded_data:
@@ -53,8 +40,6 @@ def decode(encoded_data , dict , raw_length , block_size):
             decoded_data.pop()
     return decoded_data
 
-
-# In[5]:
 
 
 def decode_unit(decoded , encoded , decode_dict , length): #takes a sorted list [(char , lower , higher)]
@@ -72,8 +57,6 @@ def decode_unit(decoded , encoded , decode_dict , length): #takes a sorted list 
     return decoded
 
 
-# In[6]:
-
 
 def binary_search(code,d,lower,p,left,right): # binary search that checks the bounderies
     if(left <= right):
@@ -90,108 +73,73 @@ def binary_search(code,d,lower,p,left,right): # binary search that checks the bo
     else:
         raise ValueError('Could Not Decode ' + str(code))
 
+def read_image(input_file):
+    img = Image.open(input_file).convert("L") #read an Image and convert it into a grayscale image 
+    arr = array(img).flatten() #flatten the image 
+    #build a counter of the probability of each pixel 
+    c = Counter(arr) 
+    prob_arr = []
+    for p in c:
+        c[p] = c[p] / len(arr)
+    for i in range(256): #create the 1d array to be saved 
+        prob_arr.append(c[i])
+    c = c.most_common() #sort it as a list of tubles
+    prob_arr = array(prob_arr)
+    save('prob',prob_arr)
+    return arr
 
-# In[7]:
+def get_counter():
+    counter  = []
+    prob_arr = load('prob.npy')
+    for p in enumerate(prob_arr):
+        if (p[1]):
+            counter.append((p[0],p[1]))
+    counter.sort(key=lambda x:x[1], reverse=True)
+    return counter
 
-
-img = Image.open("mn.png").convert("L") #read an Image and convert it into a grayscale image 
-
-
-# In[8]:
-
-
-arr = array(img).flatten() #flatten the image 
-
-
-# In[9]:
-
-
-#build a counter of the probability of each pixel 
-c = Counter(arr) 
-prob_arr = []
-for p in c:
-    c[p] = c[p] / len(arr)
-for i in range(256): #create the 1d array to be saved 
-    prob_arr.append(c[i])
-c = c.most_common() #sort it as a list of tubles
-prob_arr = array(prob_arr)
-save('prob',prob_arr)
-
-
-# In[10]:
+if len(sys.argv) != 4 and len(sys.argv) != 6 :
+    raise('Wrong input.\nEnter encode <inputFile> <outputFile> to encode your file or \n\
+        Enter decode <inputFile> <outputFile> <width> <height> to decode your file')
 
 
-counter  = []
-prob_arr = load('prob.npy')
-for p in enumerate(prob_arr):
-    if (p[1]):
-        counter.append((p[0],p[1]))
-counter.sort(key=lambda x:x[1], reverse=True)
-
-
-# In[11]:
-
-
-d = defaultdict(list)
-sum = 0 
-for i in counter:
-    d[i[0]] = (sum , sum + i[1])
-    sum += i[1]
-
-
-# In[20]:
-
-
-encoded = encode(arr,d,4)
-
-
-# In[21]:
-
-
-encoded = array(encoded)
-
-
-# In[22]:
-
-
-save('encoded2' , encoded )
-
-
-# In[23]:
-
-
-encoded = load('encoded2.npy')
-
-
-# In[24]:
-
-
-decode_dict = []
-sum = 0 
-for i in counter:
-    decode_dict.append((i[0],sum , sum + i[1]))
-    sum += i[1]
-
-
-# In[25]:
-
-
-photo = decode(encoded , decode_dict ,len(arr),4)
-
-
-# In[26]:
-
-
-p = reshape(array(photo , dtype = uint8),(-1 , img.width))
-
-
-# In[27]:
-
-
-Image.fromarray(p)
-
-
-# In[ ]:
+if sys.argv[1] == 'encode':
+    try:
+        input_file = sys.argv[2]
+        output_file = sys.argv[3]
+        image = read_image(input_file)
+        counter = get_counter()
+        d = defaultdict(list)
+        sum = 0 
+        for i in counter:
+            d[i[0]] = (sum , sum + i[1])
+            sum += i[1]
+        encoded = encode(image,d,4)
+        encoded = array(encoded)
+        save(output_file , encoded )
+    except:
+        raise('please choose a valid input')
+elif sys.argv[1] == 'decode':
+    if(len(sys.argv) != 6):
+        raise('Wrong input.\nEnter decode <inputFile> <outputFile> <width> <height> to decode your file')
+    try:
+        input_file = sys.argv[2]
+        output_file = sys.argv[3]
+        width = sys.argv[4]
+        height = sys.argv[5]
+        length = int(width) * int(height)
+        counter = get_counter()
+        encoded = load(input_file)
+        decode_dict = []
+        sum = 0 
+        for i in counter:
+            decode_dict.append((i[0],sum , sum + i[1]))
+            sum += i[1]
+        photo = decode(encoded , decode_dict ,length,4)
+        p = reshape(array(photo , dtype = 'uint8'),(-1 ,int(width)))
+        image = Image.fromarray(p)
+        image.save(output_file)
+    except:
+        raise('please enter valid inputs')
 
 
 
