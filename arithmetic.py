@@ -79,24 +79,26 @@ def read_image(input_file , f):
     img = Image.open(input_file).convert("L") #read an Image and convert it into a grayscale image 
     arr = array(img).flatten() #flatten the image 
     #build a counter of the probability of each pixel 
-    c = Counter(arr) 
+    c = Counter(arr)  # count each pixel 
     prob_arr = arange(256 , dtype='float' + str(f))
     for p in c:
         c[p] =c[p] / len(arr)
     for i in range(256): #create the 1d array to be saved 
         prob_arr[i] = c[i]
-    c = c.most_common() #sort it as a list of tubles
     save('prob',prob_arr)
     return arr
 
-def get_counter():
-    counter  = []
-    prob_arr = load('prob.npy')
+def get_dict():
+    encode_dict  = []
+    try:
+        prob_arr = load('prob.npy') 
+    except:
+         raise("Can't find porb.npy")
     for p in enumerate(prob_arr):
         if (p[1]):
-            counter.append((p[0],p[1]))
-    counter.sort(key=lambda x:x[1], reverse=True)
-    return counter
+            encode_dict.append((p[0],p[1])) #builds a dict to encode with 
+    encode_dict.sort(key=lambda x:x[1], reverse=True)  #sort the dict so we can apply binary search
+    return encode_dict
 
 if len(sys.argv) != 6 and len(sys.argv) != 7 :
     raise('Wrong input.\nEnter encode <input_file> <output_file> <block_size>  <float_size> to encode your file or \n\
@@ -105,13 +107,12 @@ if len(sys.argv) != 6 and len(sys.argv) != 7 :
 
 if sys.argv[1] == 'encode':
     try:
-        f='64'
         input_file = sys.argv[2]
         output_file = sys.argv[3]
         block_size = int(sys.argv[4])
         float_size = sys.argv[5] 
         image = read_image(input_file , float_size)
-        counter = get_counter()
+        counter = get_dict()
         d = defaultdict(list)
         sum = 0 
         for i in counter:
@@ -132,12 +133,12 @@ elif sys.argv[1] == 'decode':
         height = sys.argv[5]
         block_size = int(sys.argv[6])
         length = int(width) * int(height)
-        counter = get_counter()
+        en_dict = get_dict()
         encoded = load(input_file)
         print(type(encoded[0]))
         decode_dict = []
         sum = 0 
-        for i in counter:
+        for i in en_dict:
             decode_dict.append((i[0],sum , sum + i[1]))
             sum += i[1]
         photo = decode(encoded , decode_dict ,length,block_size)
